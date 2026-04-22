@@ -1,0 +1,6 @@
+{
+  "name": "Box Agent",
+  "description": "An intelligent RAG-based agent that fetches and indexes content from Box, transcribes audio/video with Whisper, and answers questions using Gemini AI and ChromaDB.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["box-api", "rag", "whisper-transcription", "gemini-ai"]
+}
