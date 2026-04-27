@@ -6,6 +6,14 @@ coverage/
 *.log
 .env*
 !.env.example
-__pycache__
-chroma_db
+__pycache__/
+chroma_db/
+backend/venv/
+backend/downloads/
+backend/chroma_db/
+backend/__pycache__/
+*.db
+*.sqlite3
 .env
+.python-version
+.vscode/

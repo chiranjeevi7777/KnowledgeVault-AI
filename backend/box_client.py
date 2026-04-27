@@ -52,7 +52,7 @@ def _walk_folder(folder_id: str, path: str = "/") -> Generator[dict, None, None]
             offset = 0
             limit = 500
             while True:
-                response = client.get(url, params={"limit": limit, "offset": offset, "fields": "id,type,name,size"})
+                response = client.get(url, params={"limit": limit, "offset": offset, "fields": "id,type,name,size,modified_at"})
                 response.raise_for_status()
                 data = response.json()
                 
@@ -72,19 +72,24 @@ def _walk_folder(folder_id: str, path: str = "/") -> Generator[dict, None, None]
                                 "video"
                             )
                             yield {
-                                "id":         item["id"],
-                                "name":       item["name"],
-                                "path":       f"{path}{item['name']}",
-                                "extension":  ext,
-                                "type_group": group,
-                                "size":       item.get("size", 0),
+                                "id":          item["id"],
+                                "name":        item["name"],
+                                "path":        f"{path}{item['name']}",
+                                "extension":   ext,
+                                "type_group":  group,
+                                "size":        item.get("size", 0),
+                                "modified_at": item.get("modified_at"),
                             }
                 
                 offset += limit
                 if offset >= data.get("total_count", 0):
                     break
     except httpx.HTTPStatusError as exc:
-        logger.error("Error walking folder %s: HTTP %s - %s", folder_id, exc.response.status_code, exc.response.text)
+        if exc.response.status_code == 401:
+            logger.error("BOX AUTHENTICATION FAILED: Your Developer Token has likely expired.")
+            logger.error("Please generate a fresh token at https://app.box.com/developers/console and update BOX_DEVELOPER_TOKEN in your .env file.")
+        else:
+            logger.error("Error walking folder %s: HTTP %s - %s", folder_id, exc.response.status_code, exc.response.text)
     except Exception as exc:
         logger.error("Error walking folder %s: %s", folder_id, exc)
 

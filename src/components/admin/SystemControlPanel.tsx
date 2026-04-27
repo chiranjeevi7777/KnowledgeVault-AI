@@ -242,7 +242,7 @@ export default function SystemControlPanel() {
           {/* Idle placeholder */}
           {(!status || status.status === 'idle') && (
             <p className="text-sm text-slate-400 pt-2">
-              No ingestion has run yet. Click <strong>"Run Ingestion"</strong> to index your Box folder.
+              No ingestion has run yet.
             </p>
           )}
 
@@ -252,41 +252,33 @@ export default function SystemControlPanel() {
           )}
         </div>
 
-        <div className="space-y-3 mt-6">
-          {/* Run Ingestion */}
-          <button
-            id="run-ingestion-btn"
-            onClick={triggerIngest}
-            disabled={isBusy}
-            className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-box-blue transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {isRunning || triggering ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Running…</>
-            ) : (
-              <><PlayCircle className="w-4 h-4" /> Run Ingestion Pipeline</>
-            )}
-          </button>
+        <div className="space-y-6 mt-6">
+          <div className="p-5 bg-brand-primary/5 border border-brand-primary/10 rounded-[1.5rem] space-y-3">
+             <div className="flex items-center gap-2 text-brand-primary font-bold">
+                <Activity className="w-5 h-5" />
+                <span className="text-sm">Automated Pipeline</span>
+             </div>
+             <p className="text-xs text-slate-500 leading-relaxed">
+               Dynamic ingestion is now <strong>active</strong>. The system automatically scans and indexes new Box files whenever an authorized user logs into the portal.
+             </p>
+          </div>
 
-          {/* Clear & Re-Index */}
-          <button
-            id="clear-reingest-btn"
-            onClick={clearAndReingest}
-            disabled={isBusy}
-            className="w-full py-3 bg-rose-50 text-rose-600 border border-rose-100 rounded-2xl font-bold hover:bg-rose-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
-          >
-            {clearing ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Clearing…</>
-            ) : (
-              <><Trash2 className="w-4 h-4" /> Clear &amp; Full Re-Index</>
-            )}
-          </button>
+          <div className="p-5 bg-emerald-50 border border-emerald-100 rounded-[1.5rem] space-y-3">
+             <div className="flex items-center gap-2 text-emerald-600 font-bold">
+                <ShieldCheck className="w-5 h-5" />
+                <span className="text-sm">Multimedia Processing</span>
+             </div>
+             <p className="text-xs text-slate-500 leading-relaxed">
+               Whisper transcription is enabled for <code>.mp3</code> and <code>.mp4</code> files found in the source directory.
+             </p>
+          </div>
 
           {/* Refresh env */}
           <button
             onClick={() => { fetchEnv(); fetchStatus(); }}
-            className="w-full py-2.5 bg-slate-50 text-slate-500 border border-slate-100 rounded-2xl font-bold hover:bg-slate-100 transition-colors flex items-center justify-center gap-2 text-xs"
+            className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-brand-primary transition-all flex items-center justify-center gap-2 text-sm shadow-xl shadow-slate-100 shadow-brand-primary/5 active:scale-95"
           >
-            <RefreshCw className="w-3 h-3" /> Refresh Status
+            <RefreshCw className="w-4 h-4" /> Refresh System Status
           </button>
         </div>
       </div>

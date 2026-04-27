@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { motion } from 'motion/react';
-import { Mail, Lock, ArrowRight, ShieldCheck, User } from 'lucide-react';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Mail, Lock, ArrowRight, ShieldCheck, User, Loader2, CheckCircle2 } from 'lucide-react';
 
 interface AuthScreenProps {
   onUserAuth: () => void;
@@ -9,134 +9,232 @@ interface AuthScreenProps {
 
 export default function AuthScreen({ onUserAuth, onDevAuth }: AuthScreenProps) {
   const [role, setRole] = useState<'user' | 'developer'>('user');
+  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    try {
+      // In a real app, we might check email too, but here we use the admin password logic for the trigger
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+
+      if (response.ok) {
+        setSuccess(true);
+        // Simulate a short delay to show "Ingestion Triggered" feel
+        setTimeout(() => {
+          if (role === 'user') onUserAuth();
+          else onDevAuth();
+        }, 1500);
+      } else {
+        const data = await response.json();
+        setError(data.detail || 'Invalid credentials');
+        setLoading(false);
+      }
+    } catch (err) {
+      setError('Could not connect to authentication server.');
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="flex min-h-screen bg-white">
+    <div className="flex min-h-screen bg-[#FDFCFE]">
       {/* Decorative Brand Rail */}
-      <div className="flex w-24 flex-col items-center py-12 border-r border-slate-100 shrink-0 bg-slate-50/50">
-        <div className="flex flex-col items-center gap-1 opacity-80">
-          <span className="text-box-blue font-black text-xl tracking-tighter">Box</span>
+      <div className="flex w-24 flex-col items-center py-12 border-r border-slate-100 shrink-0 bg-white shadow-[inset_-1px_0_0_rgba(0,0,0,0.02)]">
+        <div className="flex flex-col items-center gap-2">
+           <div className="w-12 h-12 bg-brand-primary rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-xl shadow-brand-primary/20 rotate-3">E</div>
+           <span className="text-brand-primary font-black text-[10px] uppercase tracking-widest mt-2">v1.2</span>
         </div>
       </div>
 
       {/* Main area */}
-      <div className="flex flex-1 items-center justify-center bg-[#E8F0FD] p-12 lg:p-24 relative overflow-hidden text-slate-800">
-        {/* Decorative circles */}
-        <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] rounded-full bg-box-blue/5 blur-3xl pointer-events-none" />
-        <div className="absolute bottom-[-10%] left-[-5%] w-[400px] h-[400px] rounded-full bg-box-blue/10 blur-3xl pointer-events-none" />
+      <div className="flex flex-1 items-center justify-center bg-gradient-to-br from-[#F5F1FF] to-white p-6 lg:p-24 relative overflow-hidden">
+        {/* Dynamic Background Elements */}
+        <div className="absolute top-[-20%] right-[-10%] w-[800px] h-[800px] rounded-full bg-brand-primary/5 blur-[120px] pointer-events-none" />
+        <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] rounded-full bg-brand-secondary/5 blur-[100px] pointer-events-none" />
 
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex w-full max-w-6xl bg-white rounded-[2.5rem] overflow-hidden shadow-2xl h-[700px] border border-white/20"
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          className="flex w-full max-w-6xl bg-white/80 backdrop-blur-xl rounded-[3rem] overflow-hidden shadow-[0_32px_64px_-16px_rgba(84,36,131,0.15)] h-[740px] border border-white"
         >
-          {/* Left Visual */}
-          <div className="hidden lg:block w-1/2 relative bg-slate-900 overflow-hidden">
-            <img
-              src="https://images.unsplash.com/photo-1497215728101-856f4ea42174?auto=format&fit=crop&q=80&w=1200"
-              alt="workspace"
-              className="w-full h-full object-cover opacity-50 scale-105"
-              referrerPolicy="no-referrer"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent flex flex-col justify-end p-16">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 bg-box-blue rounded-xl">
-                  {/* Box logo mark */}
-                  <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 3a7 7 0 110 14A7 7 0 0112 5zm0 2a5 5 0 100 10A5 5 0 0012 7zm0 2a3 3 0 110 6 3 3 0 010-6z"/>
-                  </svg>
+          {/* Left Side: Visual Experience */}
+          <div className="hidden lg:block w-5/12 relative overflow-hidden">
+            <div className="absolute inset-0 bg-slate-900">
+               <img
+                src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80&w=2000"
+                alt="collaboration"
+                className="w-full h-full object-cover opacity-60 scale-110"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#120524] via-[#120524]/60 to-transparent" />
+            </div>
+            
+            <div className="absolute inset-0 p-16 flex flex-col justify-end">
+              <motion.div 
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.4 }}
+                className="space-y-6"
+              >
+                <div className="inline-flex items-center gap-3 px-4 py-2 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20">
+                  <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-white text-xs font-bold uppercase tracking-widest">System Operational</span>
                 </div>
-                <span className="text-white font-bold text-2xl tracking-tighter">Box Agent</span>
-              </div>
-              <p className="text-slate-300 text-lg leading-relaxed max-w-sm font-medium">
-                Enterprise intelligence across every Box folder and file — powered by Gemini AI.
-              </p>
+                <h1 className="text-5xl font-black text-white leading-[1.1] tracking-tight">
+                  Intelligence for <br/>
+                  <span className="text-brand-accent">Ellucian</span> Enterprise.
+                </h1>
+                <p className="text-slate-300 text-lg leading-relaxed max-w-sm font-medium">
+                  Dynamic vector ingestion & multimedia processing across your entire document ecosystem.
+                </p>
+                <div className="flex items-center gap-6 pt-4 text-white/40">
+                   <div className="flex flex-col">
+                      <span className="text-2xl font-bold text-white">Gemini</span>
+                      <span className="text-[10px] uppercase font-black tracking-tighter">Model LLM</span>
+                   </div>
+                   <div className="w-px h-8 bg-white/10" />
+                   <div className="flex flex-col">
+                      <span className="text-2xl font-bold text-white">Chroma</span>
+                      <span className="text-[10px] uppercase font-black tracking-tighter">Vector DB</span>
+                   </div>
+                </div>
+              </motion.div>
             </div>
           </div>
 
-          {/* Login Form */}
-          <div className="w-full lg:w-1/2 p-12 lg:p-20 flex flex-col justify-center bg-white">
-            <div className="mb-14 space-y-8">
-              <div className="flex flex-col gap-0 border-b border-slate-50 pb-6">
-                <span className="text-box-blue font-black text-4xl tracking-tighter leading-none">Box</span>
-                <span className="text-slate-400 text-[10px] font-black tracking-[0.4em] uppercase leading-none mt-2">
-                  Identity Portal
-                </span>
-              </div>
-
-              {/* Role switcher */}
-              <div className="flex bg-slate-50 p-1.5 rounded-2xl border border-slate-100 max-w-sm">
-                <button
-                  onClick={() => setRole('user')}
-                  className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl transition-all text-xs font-bold ${
-                    role === 'user' ? 'bg-white shadow-sm text-box-blue' : 'text-slate-400'
-                  }`}
+          {/* Right Side: Identity Portal */}
+          <div className="w-full lg:w-7/12 p-12 lg:p-24 flex flex-col justify-center bg-white relative">
+            <AnimatePresence mode="wait">
+              {success ? (
+                <motion.div
+                  key="success"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="text-center space-y-6"
                 >
-                  <User className="w-4 h-4" />
-                  Employee
-                </button>
-                <button
-                  onClick={() => setRole('developer')}
-                  className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl transition-all text-xs font-bold ${
-                    role === 'developer' ? 'bg-white shadow-sm text-box-blue' : 'text-slate-400'
-                  }`}
-                >
-                  <ShieldCheck className="w-4 h-4" />
-                  Developer
-                </button>
-              </div>
+                  <div className="w-24 h-24 bg-emerald-100 text-emerald-600 rounded-[2rem] flex items-center justify-center mx-auto shadow-xl shadow-emerald-100">
+                    <CheckCircle2 className="w-12 h-12" />
+                  </div>
+                  <h2 className="text-4xl font-black text-slate-800 tracking-tight">Access Granted</h2>
+                  <div className="space-y-2">
+                    <p className="text-slate-500 font-medium">Triggering dynamic ingestion pipeline...</p>
+                    <div className="w-48 h-1.5 bg-slate-100 rounded-full mx-auto overflow-hidden">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: "100%" }}
+                        transition={{ duration: 1.5 }}
+                        className="h-full bg-emerald-500"
+                      />
+                    </div>
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.div key="form" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-12">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 mb-2">
+                       <span className="text-brand-primary p-1 rounded-lg bg-brand-primary/5">
+                          <CheckCircle2 className="w-5 h-5" />
+                       </span>
+                       <span className="text-[10px] font-black tracking-[0.4em] text-slate-400 uppercase">Secure Identity Portal</span>
+                    </div>
+                    <h2 className="text-5xl font-black text-slate-900 tracking-tight leading-none">
+                      Ellucian <span className="text-brand-primary font-medium tracking-tighter">Agent</span>
+                    </h2>
+                  </div>
 
-              <h2 className="text-2xl font-medium text-slate-700">
-                {role === 'user' ? 'Direct Retrieval Access' : 'Admin Authorization'}
-              </h2>
-            </div>
+                  {/* Role Switcher */}
+                  <div className="flex bg-slate-50 p-1.5 rounded-3xl border border-slate-100 max-w-xs shadow-sm">
+                    <button
+                      onClick={() => setRole('user')}
+                      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-[1.25rem] transition-all text-sm font-bold ${
+                        role === 'user' ? 'bg-white shadow-md text-brand-primary' : 'text-slate-400'
+                      }`}
+                    >
+                      <User className="w-4 h-4" />
+                      Employee
+                    </button>
+                    <button
+                      onClick={() => setRole('developer')}
+                      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-[1.25rem] transition-all text-sm font-bold ${
+                        role === 'developer' ? 'bg-white shadow-md text-brand-primary' : 'text-slate-400'
+                      }`}
+                    >
+                      <ShieldCheck className="w-4 h-4" />
+                      Admin
+                    </button>
+                  </div>
 
-            <form
-              className="space-y-6"
-              onSubmit={(e) => { e.preventDefault(); role === 'user' ? onUserAuth() : onDevAuth(); }}
-            >
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">
-                  Corporate Email
-                </label>
-                <div className="relative group">
-                  <Mail className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-box-blue transition-colors" />
-                  <input
-                    type="email"
-                    placeholder="name@yourcompany.com"
-                    className="w-full pl-14 pr-6 py-4 bg-slate-50/50 border border-slate-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-box-blue/5 focus:border-box-blue outline-none transition-all placeholder:text-slate-300"
-                  />
-                </div>
-              </div>
+                  <form className="space-y-6" onSubmit={handleLogin}>
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Work Email</label>
+                      <div className="relative group">
+                        <Mail className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-brand-primary transition-colors" />
+                        <input
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="j.smith@ellucian.edu"
+                          required
+                          className="w-full pl-16 pr-6 py-5 bg-slate-50 border border-slate-100 rounded-2xl focus:bg-white focus:ring-[6px] focus:ring-brand-primary/5 focus:border-brand-primary outline-none transition-all font-medium text-slate-700 placeholder:text-slate-300"
+                        />
+                      </div>
+                    </div>
 
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">
-                  Passkey
-                </label>
-                <div className="relative group">
-                  <Lock className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-box-blue transition-colors" />
-                  <input
-                    type="password"
-                    placeholder="••••••••"
-                    className="w-full pl-14 pr-6 py-4 bg-slate-50/50 border border-slate-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-box-blue/5 focus:border-box-blue outline-none transition-all placeholder:text-slate-300"
-                  />
-                </div>
-              </div>
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Access Token</label>
+                      <div className="relative group">
+                        <Lock className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-brand-primary transition-colors" />
+                        <input
+                          type="password"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="••••••••••••"
+                          required
+                          className="w-full pl-16 pr-6 py-5 bg-slate-50 border border-slate-100 rounded-2xl focus:bg-white focus:ring-[6px] focus:ring-brand-primary/5 focus:border-brand-primary outline-none transition-all font-medium text-slate-700 placeholder:text-slate-300"
+                        />
+                      </div>
+                    </div>
 
-              <button
-                type="submit"
-                className="w-full bg-box-blue text-white py-5 rounded-2xl flex items-center justify-center gap-4 font-bold shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all active:scale-[0.98] group mt-6 text-lg"
-              >
-                Access Box Agent
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1.5 transition-transform" />
-              </button>
-            </form>
+                    {error && (
+                      <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="p-4 bg-rose-50 text-rose-600 rounded-2xl text-xs font-bold border border-rose-100">
+                        {error}
+                      </motion.div>
+                    )}
 
-            <div className="mt-12 text-center">
-              <span className="text-[9px] font-black tracking-[0.3em] text-slate-300 uppercase">
-                Secured by Box Platform · Powered by Gemini AI
-              </span>
-            </div>
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full bg-brand-primary text-white py-6 rounded-[1.5rem] flex items-center justify-center gap-3 font-bold shadow-2xl shadow-brand-primary/30 hover:bg-brand-secondary transition-all active:scale-[0.98] group relative overflow-hidden"
+                    >
+                      {loading ? (
+                        <Loader2 className="w-6 h-6 animate-spin" />
+                      ) : (
+                        <>
+                          <span className="text-lg">Authorize Access</span>
+                          <ArrowRight className="w-5 h-5 group-hover:translate-x-2 transition-transform" />
+                        </>
+                      )}
+                    </button>
+                  </form>
+
+                  <div className="pt-4 text-center">
+                    <span className="text-[9px] font-black tracking-[0.3em] text-slate-300 uppercase">
+                      Enterprise Grade Retrieval · Verified Ellucian Environment
+                    </span>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </motion.div>
       </div>

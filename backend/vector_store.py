@@ -70,19 +70,21 @@ def search_similar(
     results = collection.query(
         query_embeddings = [query_embedding],
         n_results        = n,
-        include          = ["documents", "metadatas", "distances"],
+        include          = ["documents", "metadatas", "distances", "embeddings"],
     )
 
     output = []
     docs      = results["documents"][0]
     metas     = results["metadatas"][0]
     distances = results["distances"][0]
+    embs      = results["embeddings"][0]
 
-    for doc, meta, dist in zip(docs, metas, distances):
+    for doc, meta, dist, emb in zip(docs, metas, distances, embs):
         output.append({
-            "text":     doc,
-            "metadata": meta,
-            "score":    round(1.0 - dist, 4),  # cosine distance → similarity
+            "text":      doc,
+            "metadata":  meta,
+            "score":     round(1.0 - dist, 4),  # cosine distance → similarity
+            "embedding": emb,
         })
 
     return output

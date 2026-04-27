@@ -200,9 +200,11 @@ async def process_single_file(file_info: dict) -> list[dict]:
         # Chunk
         chunks = _chunk_text(text)
         for i, chunk_text in enumerate(chunks):
+            # Include filename in the actual searchable text for better retrieval
+            searchable_text = f"File: {name}\nContent: {chunk_text}"
             all_chunks.append({
                 "id":       f"{file_id}_c{i}",
-                "text":     chunk_text,
+                "text":     searchable_text,
                 "metadata": {
                     "box_file_id": file_id,
                     "file_name":   name,

@@ -22,6 +22,7 @@ from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
+from datetime import datetime
 from dotenv import load_dotenv
 
 load_dotenv(override=True)
@@ -52,13 +53,33 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+from fastapi.responses import JSONResponse
+import traceback
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=["*"], # Relax for testing
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    err_msg = f"Unhandled Exception: {exc}\n{traceback.format_exc()}"
+    logger.error(err_msg)
+    
+    # Save to a dedicated error log file we can read
+    try:
+        with open("server_error.log", "a", encoding="utf-8") as f:
+            f.write(f"\n{'='*80}\n{datetime.now().isoformat()}\n{err_msg}\n")
+    except:
+        pass
+
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc), "traceback": traceback.format_exc()},
+    )
 
 
 # ── Pydantic schemas ──────────────────────────────────────────────────────────
@@ -77,7 +98,28 @@ class ChatResponse(BaseModel):
 # ── Health ────────────────────────────────────────────────────────────────────
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "service": "Box Agent API", "version": "1.0.0"}
+    # Test Box token
+    from box_client import _get_headers
+    import httpx
+    box_ok = False
+    try:
+        headers = _get_headers()
+        async with httpx.AsyncClient() as client:
+            res = await client.get("https://api.box.com/2.0/users/me", headers=headers)
+            box_ok = res.status_code == 200
+    except:
+        pass
+
+    # Test Bedrock session (quick list models or just check env)
+    aws_ok = bool(os.getenv("AWS_SESSION_TOKEN")) # Simple check for now
+    
+    return {
+        "status": "ok" if box_ok else "warning",
+        "service": "Ellucian Agent API",
+        "box_connected": box_ok,
+        "aws_session_active": aws_ok,
+        "version": "1.0.0"
+    }
 
 
 # ── Chat / RAG ────────────────────────────────────────────────────────────────
@@ -118,39 +160,16 @@ async def chat(request: ChatRequest):
     )
 
 
-# ── Ingestion ─────────────────────────────────────────────────────────────────
-@app.post("/api/ingest")
-async def trigger_ingestion(background_tasks: BackgroundTasks):
-    from ingestion import ingestion_status, run_ingestion_pipeline
+class LoginRequest(BaseModel):
+    password: str
 
-    if ingestion_status.get("status") == "running":
-        return {
-            "status":  "already_running",
-            "message": "Ingestion pipeline is already in progress.",
-        }
-
-    background_tasks.add_task(run_ingestion_pipeline)
-    return {"status": "started", "message": "Ingestion pipeline started in background."}
-
-
-@app.get("/api/ingest/status")
-async def ingestion_status_endpoint():
-    from ingestion import ingestion_status
-    return ingestion_status
-
-
-@app.post("/api/ingest/clear")
-async def clear_and_reingest(background_tasks: BackgroundTasks):
-    """Clear ChromaDB collection and trigger a full fresh re-ingestion."""
-    from vector_store import clear_collection
-    from ingestion import ingestion_status, run_ingestion_pipeline
-
-    if ingestion_status.get("status") == "running":
-        return {"status": "already_running", "message": "Wait for current ingestion to complete."}
-
-    clear_collection()
-    background_tasks.add_task(run_ingestion_pipeline)
-    return {"status": "started", "message": "Collection cleared. Full re-ingestion started."}
+# ── Auth ──────────────────────────────────────────────────────────────────────
+@app.post("/api/login")
+async def login(req: LoginRequest, background_tasks: BackgroundTasks):
+    # Bypass check for now as requested by user
+    from dynamic_ingestion import trigger_dynamic_ingestion
+    background_tasks.add_task(trigger_dynamic_ingestion)
+    return {"status": "success"}
 
 
 # ── Stats ─────────────────────────────────────────────────────────────────────
@@ -205,6 +224,19 @@ async def get_folders():
     except Exception as exc:
         logger.warning("Could not fetch folder structure: %s", exc)
         return {"folders": [], "error": str(exc)}
+
+
+# ── Ingestion ─────────────────────────────────────────────────────────────────
+@app.post("/api/ingest")
+async def start_ingestion(background_tasks: BackgroundTasks):
+    from dynamic_ingestion import trigger_dynamic_ingestion
+    background_tasks.add_task(trigger_dynamic_ingestion)
+    return {"status": "started"}
+
+@app.get("/api/ingest/status")
+async def get_ingestion_status():
+    from ingestion import ingestion_status
+    return ingestion_status
 
 
 # ── Logs ──────────────────────────────────────────────────────────────────────

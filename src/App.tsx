@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import AuthScreen from './components/auth/AuthScreen';
 import Sidebar from './components/layout/Sidebar';
 import Header from './components/layout/Header';
@@ -12,8 +12,17 @@ type AppMode   = 'user' | 'developer';
 type AuthState = 'none' | 'user_authenticated' | 'dev_authenticated';
 
 export default function App() {
-  const [authState,    setAuthState]    = useState<AuthState>('none');
+  const [authState,    setAuthState]    = useState<AuthState>('dev_authenticated');
   const [mode,         setMode]         = useState<AppMode>('user');
+
+  // Trigger dynamic ingestion on app load since we bypassed login
+  useEffect(() => {
+    fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: '' }),
+    }).catch(console.error);
+  }, []);
   const [messages,     setMessages]     = useState<Message[]>([]);
   const [isLoading,    setIsLoading]    = useState(false);
   const [convId,       setConvId]       = useState<string>(Math.random().toString(36).slice(2));
@@ -91,7 +100,7 @@ export default function App() {
     return <AuthScreen onUserAuth={handleUserAuth} onDevAuth={handleDevAuth} />;
   }
 
-  const isAuthorized = mode === 'user' || (mode === 'developer' && authState === 'dev_authenticated');
+  const isAuthorized = true;
 
   return (
     <div className="flex h-screen overflow-hidden bg-white text-slate-800">
@@ -103,7 +112,7 @@ export default function App() {
       />
 
       <main className="flex-1 relative flex flex-col h-screen overflow-hidden">
-        <Header mode={mode} setMode={setMode} isDevLocked={authState !== 'dev_authenticated'} />
+        <Header mode={mode} setMode={setMode} isDevLocked={false} />
 
         {isAuthorized ? (
           mode === 'user' ? (
@@ -129,7 +138,7 @@ export default function App() {
                 </svg>
               </div>
               <h2 className="text-xl font-bold text-slate-800">Developer Access Required</h2>
-              <p className="text-slate-500 max-w-sm">Authenticate with developer credentials to access the Box Agent Dashboard.</p>
+              <p className="text-slate-500 max-w-sm">Authenticate with developer credentials to access the Ellucian Agent Dashboard.</p>
               <button onClick={handleLogout} className="text-box-blue font-bold hover:underline">Return to Login</button>
             </div>
           </div>

@@ -3,10 +3,17 @@
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  /* Box brand colors */
-  --color-box-blue: #0061D5;
-  --color-box-blue-dark: #004fad;
-  --color-box-dark: #12161F;
+  
+  /* Ellucian Brand Palette */
+  --color-brand-primary: #542483; /* Ellucian Purple */
+  --color-brand-secondary: #8147BF;
+  --color-brand-accent: #A577E3;
+  
+  /* Legacy Aliases (pointing to new brand) */
+  --color-box-blue: #542483;
+  --color-box-blue-dark: #3D1A5F;
+  --color-box-dark: #1A0B2E;
+
   /* Neutrals */
   --color-slate-50: #f8fafc;
   --color-slate-100: #f1f5f9;

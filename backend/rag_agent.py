@@ -14,6 +14,7 @@ Pipeline:
 import os
 import json
 import asyncio
+from pathlib import Path
 import logging
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
@@ -48,43 +49,155 @@ def _get_bedrock_client():
     return _bedrock_client
 
 
+import numpy as np
+
 SYSTEM_PROMPT = (
-    "You are a knowledgeable AI assistant that answers questions based on content "
-    "retrieved from Box files (transcripts, documents, and media).\n\n"
-    "Guidelines:\n"
-    "- Base your answer ONLY on the provided context. Do not invent information.\n"
-    "- If the context is insufficient, say: \"I couldn't find enough information in "
-    "the indexed Box files to answer this question accurately.\"\n"
-    "- Be concise, clear, and professional.\n"
-    "- At the end of your answer, mention which source file(s) you used."
+    "You are the Ellucian Agent, a state-of-the-art AI assistant for collegiate data analysis.\n\n"
+    "CRITICAL GUIDELINES:\n"
+    "1. TRANSCRIPTION AWARENESS: You will often see context from files ending in .mp4, .mp3, etc. "
+    "These are TRANSCRIPTIONS of the original media. Treat this text as the absolute ground truth of what was said or shown in those recordings.\n"
+    "2. NO REJECTION: Do NOT tell the user you cannot 'process' or 'watch' video/audio files. You have been provided with their text transcriptions—use them to answer the query.\n"
+    "3. ABSOLUTE GROUNDING: Answer ONLY based on the provided context. If unsure, state that the current records do not contain the answer.\n"
+    "4. CITATION: Cite sources as [Source: <file_name>].\n"
+    "5. TONE: Maintain a professional, elite, and helpful persona consistent with the Ellucian brand."
 )
 
 
+def _cosine_similarity(vec1, vec2):
+    """Compute cosine similarity between two vectors."""
+    v1 = np.array(vec1)
+    v2 = np.array(vec2)
+    dot = np.dot(v1, v2)
+    norm1 = np.linalg.norm(v1)
+    norm2 = np.linalg.norm(v2)
+    if norm1 == 0 or norm2 == 0:
+        return 0.0
+    return dot / (norm1 * norm2)
+
+
+def maximal_marginal_relevance(query_emb, candidates, lambda_param=0.5, k=10):
+    """
+    Select diverse chunks using MMR algorithm.
+    candidates: list of {text, metadata, score, embedding}
+    """
+    if not candidates:
+        return []
+    
+    selected = []
+    unselected = candidates[:]
+    
+    # Start with the most relevant chunk
+    first_choice = max(unselected, key=lambda x: x["score"])
+    selected.append(first_choice)
+    unselected.remove(first_choice)
+    
+    while len(selected) < k and unselected:
+        best_score = -float('inf')
+        best_candidate = None
+        
+        for cand in unselected:
+            # Relevance score (already cosine similarity from Chroma)
+            relevance = cand["score"]
+            
+            # Diversity score: max similarity with already selected chunks
+            redundancy = max([_cosine_similarity(cand["embedding"], s["embedding"]) for s in selected])
+            
+            # MMR Score
+            mmr_score = lambda_param * relevance - (1 - lambda_param) * redundancy
+            
+            if mmr_score > best_score:
+                best_score = mmr_score
+                best_candidate = cand
+        
+        if best_candidate:
+            selected.append(best_candidate)
+            unselected.remove(best_candidate)
+        else:
+            break
+            
+    return selected
+
+
+async def get_answer(query: str) -> dict:
+    """
+    Run the full RAG pipeline with MMR diversity re-ranking.
+    """
+    # 1. Embed query (No longer doing dynamic sync on every request for speed)
+    query_embedding = await get_embedding(query)
+
+    # 2. Search ChromaDB broadly
+    raw_results = search_similar(query_embedding, top_k=50)
+
+    if not raw_results:
+        return {
+            "answer": "I couldn't find any relevant information in the records catalog.",
+            "sources": [],
+            "chunks_used": 0,
+        }
+
+    # 3. Apply MMR for diversity (lambda=0.5 balances relevance and variety)
+    results = maximal_marginal_relevance(query_embedding, raw_results, lambda_param=0.5, k=TOP_K)
+
+    # 4. Build and Call LLM
+    user_prompt = _build_prompt(query, results)
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user",   "content": user_prompt},
+    ]
+
+    logger.info("Calling Ellucian Agent (Bedrock) with %d MMR-selected chunks", len(results))
+    answer = await asyncio.to_thread(_call_bedrock, messages)
+
+    # 5. Format sources
+    seen, sources = set(), []
+    for r in results:
+        fname = r["metadata"].get("file_name", "")
+        if fname not in seen:
+            seen.add(fname)
+            sources.append({
+                "file":        fname,
+                "path":        r["metadata"].get("folder_path", ""),
+                "box_file_id": r["metadata"].get("box_file_id", ""),
+                "score":       r["score"],
+            })
+
+    return {
+        "answer":      answer,
+        "sources":     sources,
+        "chunks_used": len(results),
+    }
+
+
 def _build_prompt(query: str, chunks: list[dict]) -> str:
+    """Build the final RAG prompt with retrieved context blocks."""
     parts = []
     for i, chunk in enumerate(chunks, 1):
         fname = chunk["metadata"].get("file_name", "unknown")
-        fpath = chunk["metadata"].get("folder_path", "")
-        score = chunk.get("score", 0)
+        # Identify if this is likely a transcription
+        ext = Path(fname).suffix.lower()
+        content_type = "Document Text"
+        if ext in ('.mp4', '.mov', '.avi'): content_type = "Video Transcription"
+        elif ext in ('.mp3', '.m4a', '.wav'): content_type = "Audio Transcription"
+
         parts.append(
-            f"[Context {i} | File: {fname} | Path: {fpath} | Relevance: {score:.0%}]\n"
+            f"[RECORD {i} | Source: {fname} | Type: {content_type}]\n"
             f"{chunk['text']}"
         )
     context_block = "\n\n---\n\n".join(parts)
     return (
-        f"Context from Box files:\n\n{context_block}\n\n"
-        f"---\n\nUser Question: {query}\n\nAnswer:"
+        f"Retrieved Records from Ellucian Box Metadata:\n\n{context_block}\n\n"
+        f"--- USER QUESTION ---\n{query}\n\n"
+        "Please provide a comprehensive answer based on the records above:"
     )
 
 
 def _call_bedrock(messages: list[dict]) -> str:
     """
-    Synchronous Bedrock invocation using the Anthropic Claude Messages API format.
-    Wrapped in asyncio.to_thread for non-blocking async usage.
+    Call Amazon Bedrock (Claude) using the Messages API.
     """
     client = _get_bedrock_client()
 
-    # Separate system message from user messages (Claude on Bedrock requires this)
+    # Separate system message from user messages
     system_content = ""
     user_messages = []
     for msg in messages:
@@ -112,96 +225,6 @@ def _call_bedrock(messages: list[dict]) -> str:
         response_body = json.loads(response["body"].read())
         return response_body["content"][0]["text"].strip()
 
-    except (BotoCoreError, ClientError) as e:
-        logger.error("Amazon Bedrock invocation failed: %s", e)
-        raise RuntimeError(f"Bedrock call failed: {e}") from e
-
-
-async def get_answer(query: str) -> dict:
-    """
-    Run the full RAG pipeline for a user query.
-
-    Returns:
-        {
-            "answer":      str,
-            "sources":     list[{file, path, box_file_id, score}],
-            "chunks_used": int,
-        }
-    """
-    # 0. Dynamic Box Search and Ingestion
-    logger.info("Dynamically searching Box for files matching query: %s", query[:80])
-    from box_client import search_box
-    from ingestion import ingest_dynamically
-
-    # Search Box for the user's query and ingest any new relevant files found.
-    found_files = await asyncio.to_thread(search_box, query, 5)
-    if found_files:
-        await ingest_dynamically(found_files)
-
-    # 1. Embed query
-    logger.info("Embedding query: %s", query[:80])
-    query_embedding = await get_embedding(query)
-
-    # 2. Search ChromaDB broadly to prevent a large file from dominating
-    raw_results = search_similar(query_embedding, top_k=50)
-
-    if not raw_results:
-        return {
-            "answer": (
-                "I couldn't find any relevant information in the indexed Box files. "
-                "Please run the ingestion pipeline first to index your Box content."
-            ),
-            "sources":     [],
-            "chunks_used": 0,
-        }
-
-    # Diverse chunk selection: max 3 chunks per file, up to TOP_K chunks total
-    seen_files: dict[str, int] = {}
-    results = []
-    for r in raw_results:
-        fname = r["metadata"].get("file_name", "")
-        seen_files[fname] = seen_files.get(fname, 0) + 1
-
-        if seen_files[fname] <= 3:
-            results.append(r)
-
-        if len(results) >= TOP_K:
-            break
-
-    # 3. Build messages for Bedrock
-    user_prompt = _build_prompt(query, results)
-    messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user",   "content": user_prompt},
-    ]
-
-    # 4. Call Amazon Bedrock (async-wrapped)
-    logger.info(
-        "Calling Amazon Bedrock model '%s' with %d diverse chunks…",
-        BEDROCK_MODEL_ID, len(results)
-    )
-    answer = await asyncio.to_thread(_call_bedrock, messages)
-
-    # 5. Deduplicate sources
-    seen, sources = set(), []
-    for r in results:
-        fname = r["metadata"].get("file_name", "")
-        if fname not in seen:
-            seen.add(fname)
-            sources.append({
-                "file":        fname,
-                "path":        r["metadata"].get("folder_path", ""),
-                "box_file_id": r["metadata"].get("box_file_id", ""),
-                "score":       r["score"],
-            })
-
-    logger.info(
-        "Answer generated via Amazon Bedrock. Sources: %s",
-        [s["file"] for s in sources]
-    )
-
-    return {
-        "answer":      answer,
-        "sources":     sources,
-        "chunks_used": len(results),
-    }
+    except Exception as e:
+        logger.error("Bedrock call failed: %s", e)
+        raise RuntimeError(f"Amazon Bedrock error: {e}")

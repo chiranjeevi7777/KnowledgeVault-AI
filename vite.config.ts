@@ -18,6 +18,7 @@ export default defineConfig(({mode}) => {
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       hmr: process.env.DISABLE_HMR !== 'true',
+      allowedHosts: ['licenses-cure-chains-script.trycloudflare.com'],
       // Proxy all /api/* calls to the FastAPI backend on port 8000
       proxy: {
         '/api': {

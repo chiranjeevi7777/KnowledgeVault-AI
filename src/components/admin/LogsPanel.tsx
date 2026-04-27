@@ -52,7 +52,7 @@ export default function LogsPanel() {
           </div>
           <div>
             <h3 className="text-xl font-bold text-white tracking-tight">Real-time System Logs</h3>
-            <p className="text-slate-500 font-medium text-sm">Box Agent pipeline events and health.</p>
+            <p className="text-slate-500 font-medium text-sm">Ellucian Agent pipeline events and health.</p>
           </div>
         </div>
         <div className="flex items-center gap-2">

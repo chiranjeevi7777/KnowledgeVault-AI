@@ -65,11 +65,11 @@ export default function Sidebar({ mode, onLogout, onNewChat, onSelectQuery }: Si
     <div className="w-72 bg-[#FBFCFE] border-r border-slate-100 flex flex-col h-screen p-6 relative">
       {/* Brand Header */}
       <div className="flex items-center gap-3 mb-10 pl-2">
-        <div className="w-10 h-10 bg-box-blue rounded-xl flex items-center justify-center text-white font-black text-lg shadow-lg shadow-blue-100">
-          B
+        <div className="w-10 h-10 bg-brand-primary rounded-xl flex items-center justify-center text-white font-black text-lg shadow-lg shadow-brand-primary/20 rotate-3">
+          E
         </div>
         <div className="flex flex-col">
-          <span className="text-slate-800 font-bold text-lg leading-none tracking-tight">Box Agent</span>
+          <span className="text-slate-800 font-bold text-lg leading-none tracking-tight">Ellucian Agent</span>
           <span className="text-slate-400 text-[10px] font-bold tracking-widest leading-none mt-1 uppercase">
             RAG Retrieval
           </span>
@@ -80,7 +80,7 @@ export default function Sidebar({ mode, onLogout, onNewChat, onSelectQuery }: Si
       <button
         id="new-retrieval-btn"
         onClick={onNewChat}
-        className="flex items-center justify-between w-full bg-slate-900 text-white rounded-xl py-4 px-4 mb-8 shadow-xl shadow-slate-100 hover:bg-slate-800 transition-all hover:scale-[1.02] active:scale-[0.98] group"
+        className="flex items-center justify-between w-full bg-slate-900 text-white rounded-xl py-4 px-4 mb-8 shadow-xl shadow-slate-100 hover:bg-brand-primary transition-all hover:scale-[1.02] active:scale-[0.98] group"
       >
         <div className="flex items-center gap-3">
           <Plus className="w-5 h-5 text-white/50 group-hover:text-white transition-colors" />
@@ -119,7 +119,7 @@ export default function Sidebar({ mode, onLogout, onNewChat, onSelectQuery }: Si
                     title={`Re-ask: "${item.query}"`}
                     className="flex items-center gap-3 w-full px-4 py-3 rounded-xl hover:bg-white hover:shadow-sm transition-all text-slate-500 hover:text-slate-800 text-left group"
                   >
-                    <Search className="w-4 h-4 text-slate-300 group-hover:text-box-blue shrink-0" />
+                    <Search className="w-4 h-4 text-slate-300 group-hover:text-brand-primary shrink-0" />
                     <div className="min-w-0">
                       <span className="text-sm font-semibold truncate block">{item.title || item.query}</span>
                       <span className="text-[10px] text-slate-300">{item.time}</span>
@@ -131,11 +131,11 @@ export default function Sidebar({ mode, onLogout, onNewChat, onSelectQuery }: Si
           )}
         </section>
 
-        {/* ── Box Folders (live from API) ── */}
+        {/* ── Records Catalog (live from API) ── */}
         <section className="space-y-3">
           <h3 className="text-[10px] font-bold tracking-[0.2em] text-slate-400 uppercase pl-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <BoxIcon className="w-3 h-3" /> Box Folders
+              <BoxIcon className="w-3 h-3" /> Records Catalog
             </div>
             <button onClick={() => setFoldersExpanded(!foldersExpanded)}>
               <ChevronDown className={`w-3 h-3 transition-transform ${foldersExpanded ? '' : '-rotate-90'}`} />
@@ -154,9 +154,9 @@ export default function Sidebar({ mode, onLogout, onNewChat, onSelectQuery }: Si
                   <button
                     key={folder.id}
                     id={`folder-${folder.id}`}
-                    className="flex items-center gap-3 w-full px-4 py-3 rounded-xl transition-all font-bold bg-blue-50/50 text-box-blue border border-blue-100/50"
+                    className="flex items-center gap-3 w-full px-4 py-3 rounded-xl transition-all font-bold bg-brand-primary/5 text-brand-primary border border-brand-primary/10"
                   >
-                    <FolderOpen className="w-4 h-4 text-box-blue shrink-0" />
+                    <FolderOpen className="w-4 h-4 text-brand-primary shrink-0" />
                     <span className="text-sm truncate">{folder.name}</span>
                   </button>,
                   ...(folder.children || []).map((child) => (
