@@ -5,6 +5,7 @@ interface EnvStatus {
   box_auth: boolean;
   box_folder: string | null;
   bedrock_auth: boolean;
+  bedrock_api_key: boolean;
   bedrock_model: string;
   aws_region: string;
   whisper: string;
@@ -27,6 +28,7 @@ export default function EnvironmentPanel() {
     { name: 'Box Auth Token',       value: env.box_auth ? 'Active' : 'Missing',  active: env.box_auth,     type: 'Secret' },
     { name: 'Box Root Folder',      value: env.box_folder || 'None',              active: !!env.box_folder, type: 'Config' },
     { name: 'AWS Bedrock Auth',     value: env.bedrock_auth ? 'Active' : 'Missing', active: env.bedrock_auth, type: 'Secret' },
+    { name: 'Bedrock API Key',      value: env.bedrock_api_key ? 'Configured' : 'Optional', active: env.bedrock_api_key, type: 'Secret' },
     { name: 'Bedrock Model',        value: env.bedrock_model,                     active: !!env.bedrock_model, type: 'Config' },
     { name: 'AWS Region',           value: env.aws_region,                        active: !!env.aws_region, type: 'Config' },
     { name: 'Whisper Transcriber',  value: env.whisper,                           active: !!env.whisper,    type: 'Local Model' },
@@ -78,13 +80,28 @@ export default function EnvironmentPanel() {
                    <p className="text-sm font-semibold text-slate-600">{item.value}</p>
                 </td>
                 <td className="py-6 px-4">
-                  <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-lg border leading-none ${
-                    item.active 
-                      ? 'bg-emerald-50 text-emerald-600 border-emerald-100/50' 
-                      : 'bg-rose-50 text-rose-600 border-rose-100/50'
-                  }`}>
-                    {item.active ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                    <span className="text-[10px] font-bold uppercase tracking-tight">{item.active ? 'Active' : 'Offline'}</span>
+                  <div className="flex items-center justify-between gap-4">
+                    <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-lg border leading-none ${
+                      item.active 
+                        ? 'bg-emerald-50 text-emerald-600 border-emerald-100/50' 
+                        : 'bg-rose-50 text-rose-600 border-rose-100/50'
+                    }`}>
+                      {item.active ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                      <span className="text-[10px] font-bold uppercase tracking-tight">{item.active ? 'Active' : 'Offline'}</span>
+                    </div>
+
+                    {item.name === 'Box Auth Token' && (
+                      <button 
+                        onClick={async () => {
+                          const resp = await fetch('/api/auth/login');
+                          const data = await resp.json();
+                          if (data.url) window.open(data.url, '_blank', 'width=600,height=700');
+                        }}
+                        className="text-[10px] font-black uppercase text-brand-primary hover:underline"
+                      >
+                        {item.active ? 'Reconnect' : 'Link Account'}
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

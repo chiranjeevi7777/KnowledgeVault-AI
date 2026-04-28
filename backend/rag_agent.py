@@ -23,7 +23,7 @@ from dotenv import load_dotenv
 from embedder import get_embedding
 from vector_store import search_similar
 
-load_dotenv()
+load_dotenv(override=True)
 logger = logging.getLogger(__name__)
 
 # ── Amazon Bedrock configuration ───────────────────────────────────────────────
@@ -39,13 +39,36 @@ def _get_bedrock_client():
     """Return a cached boto3 bedrock-runtime client."""
     global _bedrock_client
     if _bedrock_client is None:
-        _bedrock_client = boto3.client(
-            service_name="bedrock-runtime",
-            region_name=AWS_REGION,
-            aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-            aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-            aws_session_token=os.getenv("AWS_SESSION_TOKEN"),  # optional – for temp creds
-        )
+        access_key = os.getenv("AWS_ACCESS_KEY_ID")
+        secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+        session_token = os.getenv("AWS_SESSION_TOKEN")
+        api_key = os.getenv("AWS_API_KEY")
+        endpoint_url = os.getenv("AWS_BEDROCK_ENDPOINT")
+
+        client_kwargs = {
+            "service_name": "bedrock-runtime",
+            "region_name": AWS_REGION,
+            "aws_access_key_id": access_key,
+            "aws_secret_access_key": secret_key,
+        }
+        
+        if endpoint_url:
+            client_kwargs["endpoint_url"] = endpoint_url
+        
+        # Session token is ONLY for temporary credentials (keys starting with ASIA)
+        if access_key and access_key.startswith("ASIA") and session_token:
+            client_kwargs["aws_session_token"] = session_token
+
+        _bedrock_client = boto3.client(**client_kwargs)
+
+        # If an API Key is provided, we inject it via a botocore event handler
+        # This is common for Bedrock proxies/gateways that require an x-api-key header.
+        if api_key:
+            def add_api_key(request, **kwargs):
+                request.headers.add_header('x-api-key', api_key)
+            
+            _bedrock_client.meta.events.register('request-created.bedrock-runtime', add_api_key)
+
     return _bedrock_client
 
 

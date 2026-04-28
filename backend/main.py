@@ -172,6 +172,37 @@ async def login(req: LoginRequest, background_tasks: BackgroundTasks):
     return {"status": "success"}
 
 
+# ── Box OAuth ────────────────────────────────────────────────────────────────
+@app.get("/api/auth/login")
+async def auth_login():
+    from box_client import get_auth_url
+    return {"url": get_auth_url()}
+
+@app.get("/api/auth/callback")
+async def auth_callback(code: str):
+    from box_client import handle_callback
+    try:
+        await handle_callback(code)
+        # Return a simple HTML page that closes itself or redirects
+        from fastapi.responses import HTMLResponse
+        return HTMLResponse(content="""
+            <html>
+                <body style="font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; background: #f8fafc;">
+                    <div style="text-align: center; padding: 2rem; background: white; border-radius: 1rem; shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
+                        <h1 style="color: #4f46e5;">Authentication Successful!</h1>
+                        <p>Box is now connected. You can close this window.</p>
+                        <script>
+                            setTimeout(() => window.close(), 3000);
+                        </script>
+                    </div>
+                </body>
+            </html>
+        """)
+    except Exception as e:
+        logger.error("OAuth callback failed: %s", e)
+        raise HTTPException(status_code=500, detail=f"Authentication failed: {str(e)}")
+
+
 # ── Stats ─────────────────────────────────────────────────────────────────────
 @app.get("/api/stats")
 async def stats():
@@ -205,6 +236,7 @@ async def health_env():
         "box_auth":       bool(os.getenv("BOX_DEVELOPER_TOKEN")),
         "box_folder":     os.getenv("BOX_ROOT_FOLDER_ID"),
         "bedrock_auth":   bool(os.getenv("AWS_ACCESS_KEY_ID")),
+        "bedrock_api_key": bool(os.getenv("AWS_API_KEY")),
         "bedrock_model":  os.getenv("BEDROCK_MODEL_ID", "anthropic.claude-3-sonnet-20240229-v1:0"),
         "aws_region":     os.getenv("AWS_REGION", "us-east-1"),
         "whisper":        os.getenv("WHISPER_MODEL", "base"),

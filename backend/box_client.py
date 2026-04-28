@@ -1,13 +1,9 @@
-"""
-box_client.py
-─────────────
-Box API integration using a Developer Token via raw httpx requests (no boxsdk).
-"""
-
 import os
 import logging
+import json
 from pathlib import Path
 from typing import Generator
+from datetime import datetime, timedelta
 import httpx
 from dotenv import load_dotenv
 
@@ -20,17 +16,101 @@ AUDIO_EXTENSIONS      = {".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac"}
 VIDEO_EXTENSIONS      = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v"}
 ALL_SUPPORTED         = TRANSCRIPT_EXTENSIONS | AUDIO_EXTENSIONS | VIDEO_EXTENSIONS
 
+TOKEN_FILE = "tokens.json"
+
+def _load_tokens():
+    if os.path.exists(TOKEN_FILE):
+        try:
+            with open(TOKEN_FILE, "r") as f:
+                return json.load(f)
+        except:
+            return None
+    return None
+
+def _save_tokens(tokens):
+    with open(TOKEN_FILE, "w") as f:
+        json.dump(tokens, f)
+
+def get_auth_url():
+    client_id = os.getenv("BOX_CLIENT_ID")
+    redirect_uri = os.getenv("BOX_CALLBACK_URL")
+    return f"https://account.box.com/api/oauth2/authorize?response_type=code&client_id={client_id}&redirect_uri={redirect_uri}"
+
+async def handle_callback(code: str):
+    client_id = os.getenv("BOX_CLIENT_ID")
+    client_secret = os.getenv("BOX_CLIENT_SECRET")
+    redirect_uri = os.getenv("BOX_CALLBACK_URL")
+
+    url = "https://api.box.com/oauth2/token"
+    data = {
+        "grant_type": "authorization_code",
+        "code": code,
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "redirect_uri": redirect_uri
+    }
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(url, data=data)
+        resp.raise_for_status()
+        tokens = resp.json()
+        # Add expiry timestamp
+        tokens["expires_at"] = (datetime.now() + timedelta(seconds=tokens["expires_in"])).isoformat()
+        _save_tokens(tokens)
+        return tokens
+
+def _refresh_tokens(refresh_token: str):
+    client_id = os.getenv("BOX_CLIENT_ID")
+    client_secret = os.getenv("BOX_CLIENT_SECRET")
+
+    url = "https://api.box.com/oauth2/token"
+    data = {
+        "grant_type": "refresh_token",
+        "refresh_token": refresh_token,
+        "client_id": client_id,
+        "client_secret": client_secret
+    }
+
+    with httpx.Client() as client:
+        resp = client.post(url, data=data)
+        resp.raise_for_status()
+        tokens = resp.json()
+        tokens["expires_at"] = (datetime.now() + timedelta(seconds=tokens["expires_in"])).isoformat()
+        _save_tokens(tokens)
+        return tokens
 
 def _get_headers() -> dict:
     """Validate OAuth config and return headers with Bearer token authentication."""
+    # Try to load from tokens.json first
+    tokens = _load_tokens()
+    
+    if tokens:
+        # Check if expired
+        expires_at = datetime.fromisoformat(tokens["expires_at"])
+        if datetime.now() + timedelta(minutes=5) > expires_at:
+            # Refresh synchronously
+            try:
+                tokens = _refresh_tokens(tokens["refresh_token"])
+            except Exception as e:
+                logger.error("Failed to refresh Box token: %s", e)
+                # Fallback to dev token if available
+                pass
+        
+        if tokens and "access_token" in tokens:
+            return {
+                "Authorization": f"Bearer {tokens['access_token']}",
+                "Accept": "application/json"
+            }
+
+    # Fallback to developer token
     dev_token = os.getenv("BOX_DEVELOPER_TOKEN")
     client_id = os.getenv("BOX_CLIENT_ID")
     client_secret = os.getenv("BOX_CLIENT_SECRET")
 
-    if not all([dev_token, client_id, client_secret]):
+    if not dev_token and not tokens:
         raise ValueError(
-            "BOX_DEVELOPER_TOKEN, BOX_CLIENT_ID, or BOX_CLIENT_SECRET is missing in your .env file.\n"
-            "Please ensure all three OAuth configuration values are set."
+            "Neither OAuth tokens nor BOX_DEVELOPER_TOKEN found.\n"
+            "Please log in via the Auth screen or provide a developer token."
         )
 
     return {
