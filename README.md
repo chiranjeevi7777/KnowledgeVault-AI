@@ -1,12 +1,12 @@
 # Box Agent — End-to-End RAG Chatbot
 
+
+An enterprise-grade Retrieval-Augmented Generation (RAG) platform that ingests content from Box, transcribes multimedia using Whisper, indexes documents with local embeddings and ChromaDB, and delivers context-aware answers through Amazon Bedrock Claude with source citations.
+
 RAG pipeline: **Box** → **Whisper** (local) → **Amazon Bedrock Claude** → **ChromaDB** → **React Chat UI**
 
 Embeddings run **fully locally** via `sentence-transformers` (no third-party embedding API needed).
 
-## Description
-
-An enterprise-grade Retrieval-Augmented Generation (RAG) platform that ingests content from Box, transcribes multimedia using Whisper, indexes documents with local embeddings and ChromaDB, and delivers context-aware answers through Amazon Bedrock Claude with source citations.
 
 ## Quick Start
 
